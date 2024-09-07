@@ -8,7 +8,7 @@ name: Deploy app to gh-pages
 on:
   # Manually trigger the workflow
   workflow_dispatch:
-  # Trigger on push to `main` branch
+  # Trigger on push to the `main` branch
   push:
     branches: ["main"]
   # Trigger on pull request to all branches (but do not deploy to gh-pages)
