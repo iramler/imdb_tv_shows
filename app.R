@@ -10,6 +10,21 @@ tv_show_names <- tv_show_info$Show_Name
 # Define the UI
 ui <- fluidPage(
   tags$head(
+    # Insert Google Analytics tracking code here
+    HTML("
+      <!-- Google tag (gtag.js) -->
+      <script async src='https://www.googletagmanager.com/gtag/js?id=G-0G00NGQ5CF'></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+      
+        gtag('config', 'G-0G00NGQ5CF');
+      </script>
+    "),
+    
+    
+    
     tags$style(HTML("
       @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
       h1, h2 {
