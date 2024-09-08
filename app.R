@@ -255,6 +255,17 @@ server <- function(input, output, session) {
         par(mfrow = c(1, 1))
         plot.new()
         
+        # Determine the number of unique seasons
+        num_seasons <- max(tv_shows_chosen_data$seasonNumber)
+        
+        # Generate a rainbow palette with n = number of seasons
+        season_colors <- rainbow(num_seasons)
+        
+        # Map the season numbers to the rainbow colors
+        color_mapping <- setNames(season_colors, 1:num_seasons)
+        episode_colors <- color_mapping[as.character(tv_shows_chosen_data$seasonNumber)]
+        
+        
         # Calculate the start and midpoint of each season
         season_starts <- tapply(tv_shows_chosen_data$episodeNumber_overall, tv_shows_chosen_data$seasonNumber, min)
         season_mids <- tapply(tv_shows_chosen_data$episodeNumber_overall, tv_shows_chosen_data$seasonNumber, 
@@ -288,8 +299,13 @@ server <- function(input, output, session) {
         points(
           tv_shows_chosen_data$episodeNumber_overall, 
           tv_shows_chosen_data$averageRating, 
-          pch = 19, 
-          col = as.factor(tv_shows_chosen_data$seasonNumber), 
+          pch = 21,  # Filled circle with border
+          bg = episode_colors,  # Fill color with the rainbow palette
+          col = "black",  # Black outline
+          
+#          pch = 19, 
+#          col = episode_colors,  # Apply the rainbow palette colors
+##          col = as.factor(tv_shows_chosen_data$seasonNumber), 
           cex = sqrt(tv_shows_chosen_data$numVotes / max_votes_local) * 2.5  # Local scaling
         )
         
