@@ -1,12 +1,9 @@
 # Load necessary libraries
 library(shiny)
-library(dplyr)
-library(ggplot2)
-library(readr)
 
 
 # Read in data
-tv_shows <- read_csv(file = "popular_tv_shows.csv")
+tv_shows <- read.csv(file = "popular_tv_shows.csv")
 tv_show_info <- readRDS("show_names.rds")
 tv_show_names <- tv_show_info$Show_Name
 
@@ -121,7 +118,7 @@ ui <- fluidPage(
   HTML("<hr style='border-top: 1px solid #ccc;'>"),
   
   uiOutput("imdb_link_and_input"),
-  uiOutput("discussion_note"),
+  uiOutput("discussion_note"),  ### NEED THIS AGAIN
   uiOutput("tooltip_info"),
   plotOutput("episode_vs_rating_plot", click = "plot_click"),
   
@@ -147,22 +144,31 @@ server <- function(input, output, session) {
   tv_shows_chosen <- eventReactive(input$submit, {
     withProgress(message = "Fetching data for selected show...", value = 0, {
       incProgress(0.5)
-      show_data <- tv_shows %>%
-        filter(Show_Name %in% as.character(input$show_name)) %>%
-        arrange(episodeNumber_overall)
       
-      selected_show_id <- tv_show_info %>%
-        filter(Show_Name %in% as.character(input$show_name)) %>%
-        pull(parentTconst)
+      # Use base R to filter and arrange
+      show_data <- tv_shows[tv_shows$Show_Name == as.character(input$show_name), ]
+      show_data <- show_data[order(show_data$episodeNumber_overall), ]
+      
+      # Use base R to filter tv_show_info and pull the parentTconst
+      selected_show_id <- tv_show_info$parentTconst[tv_show_info$Show_Name == as.character(input$show_name)]
       
       incProgress(0.5, detail = "Data fetched successfully")
       
       # Reset the series rating when a new show is selected
       series_rating(NULL)
       
+      # Return the selected data and show name
       return(list(data = show_data, show_name = input$show_name, series_id = selected_show_id))
     })
   })
+  
+  
+  # Render the clickable discussion link after plot is generated
+  output$discussion_note <- renderUI({
+    req(input$submit)  # Ensure the plot has been generated
+    HTML("<p><strong><a href='#discussion_section'>Click here to see potential discussion questions below.</a></strong></p>")
+  })
+  
   
   # Display the IMDb link and input for series rating
   output$imdb_link_and_input <- renderUI({
@@ -180,7 +186,7 @@ server <- function(input, output, session) {
       div(style = "display: flex; align-items: baseline;",
           div(style = "margin-right: 10px;", "IMDb Series Rating:"),
           numericInput(inputId = "rating_line", label = NULL, 
-                       value = NA, min = 0, max = 10, width = "80px"),
+                       value = NA, min = 0, max = 10, step=.1, width = "80px"),
           actionButton(inputId = "update_rating", label = "Add Series Rating", style = "margin-left: 10px; height: 34px;")
       ),
       HTML("<p><strong>You can click on one of the dots to display extra information about that episode.</strong></p>")
@@ -192,15 +198,25 @@ server <- function(input, output, session) {
   
   # Placeholder plot before a show is selected
   output$episode_vs_rating_plot <- renderPlot({
-    ggplot() +
-      labs(title = "Select a TV Show to Display IMDb Episode Ratings", x = "Season", y = "Episode Rating") +
-      theme_minimal() +
-      theme(
-        axis.title.x = element_text(size = 14),  # Adjust x-axis label size
-        axis.title.y = element_text(size = 14),  # Adjust y-axis label size
-        axis.text.x = element_text(size = 12),
-        axis.text.y = element_text(size = 12)
-      )
+    # Create a blank placeholder plot before the user selects a TV show
+    plot(
+      1, type = "n",  # Empty plot
+      xlim = c(0, 10), ylim = c(0, 10),  # Arbitrary x and y limits for placeholder
+      xlab = "", ylab = "",  # Suppress default axis labels
+      main = "Select a TV Show to Display IMDb Episode Ratings",  # Title
+      axes = FALSE  # Hide default axes
+    )
+    
+    # Customize axes without default labels
+    axis(1, at = seq(0, 10, by = 1), labels = NA, cex.axis = 1.2)  # Custom x-axis ticks with no labels
+    axis(2, at = seq(0, 10, by = 1), labels = NA, cex.axis = 1.2)  # Custom y-axis ticks with no labels
+    
+    # Add larger axis titles (to match ggplot2)
+    title(xlab = "Season", cex.lab = 1.4)  # Larger x-axis label
+    title(ylab = "Episode Rating", cex.lab = 1.4)  # Larger y-axis label
+    
+    # Add a box around the plot area
+    box()
   })
   
   # Update the series rating when the "Add Series Rating" button is clicked
@@ -216,46 +232,81 @@ server <- function(input, output, session) {
       selected_show_name <- tv_shows_chosen_result$show_name
       
       req(nrow(tv_shows_chosen_data) > 0)
+      
       withProgress(message = "Rendering plot...", value = 0, {
         incProgress(0.3, detail = "Identifying seasons...")
         
-        season_starts <- tv_shows_chosen_data %>%
-          group_by(seasonNumber) %>%
-          summarize(min_episode = min(episodeNumber_overall),
-                    mid_episode = (min(episodeNumber_overall) + max(episodeNumber_overall)) / 2)
+        # Reset the graphical parameters
+        par(mfrow = c(1, 1))
+        plot.new()
         
-        p <- ggplot(tv_shows_chosen_data, aes(x = episodeNumber_overall, y = averageRating, 
-                                              color = factor(seasonNumber), size = numVotes)) +
-          geom_vline(xintercept = season_starts$min_episode, color = "grey50", linetype = "solid", linewidth = 0.3) +
-          geom_point(alpha = 1) +
-          scale_x_continuous(breaks = season_starts$mid_episode, 
-                             labels = tv_shows_chosen_data$seasonNumber[!duplicated(tv_shows_chosen_data$seasonNumber)]) +
-          labs(title = paste("IMDb Episode Ratings by Episode Number for", selected_show_name), 
-               x = "Season", y = "Episode Rating") +
-          theme_minimal() +
-          theme(
-            axis.title.x = element_text(size = 14),  # Adjust x-axis label size
-            axis.title.y = element_text(size = 14),  # Adjust y-axis label size
-            axis.text.x = element_text(size = 12),
-            axis.text.y = element_text(size = 12)
-            ) +
-          guides(color = "none", size = "none")
+        # Calculate the start and midpoint of each season
+        season_starts <- tapply(tv_shows_chosen_data$episodeNumber_overall, tv_shows_chosen_data$seasonNumber, min)
+        season_mids <- tapply(tv_shows_chosen_data$episodeNumber_overall, tv_shows_chosen_data$seasonNumber, 
+                              function(x) (min(x) + max(x)) / 2)
         
+        # Set up plot area
+        plot(
+          x = tv_shows_chosen_data$episodeNumber_overall, 
+          y = tv_shows_chosen_data$averageRating, 
+          type = "n",  # Empty plot
+          xlab = "",  
+          ylab = "",  
+          xlim = range(tv_shows_chosen_data$episodeNumber_overall),
+          ylim = range(tv_shows_chosen_data$averageRating, na.rm = TRUE),
+          main = "",
+          axes = FALSE  # Hide default axes
+        )
+        
+        # Add custom x-axis (season midpoints)
+        axis(1, at = season_mids, labels = names(season_mids), tick = TRUE, las = 1, cex.axis = 1.2)
+        
+        # Add y-axis with regular labels
+        axis(2, at = pretty(range(tv_shows_chosen_data$averageRating, na.rm = TRUE)), las = 1, cex.axis = 1.2)
+        
+        # Draw vertical lines at the start of each season
+        abline(v = season_starts, col = "grey50", lty = 2)
+        
+        # Local scaling of point sizes based on numVotes within the selected show
+        max_votes_local <- max(tv_shows_chosen_data$numVotes, na.rm = TRUE)  # Find the max within the selected show
+        
+        points(
+          tv_shows_chosen_data$episodeNumber_overall, 
+          tv_shows_chosen_data$averageRating, 
+          pch = 19, 
+          col = as.factor(tv_shows_chosen_data$seasonNumber), 
+          cex = sqrt(tv_shows_chosen_data$numVotes / max_votes_local) * 2.5  # Local scaling
+        )
+        
+        # Add horizontal series rating line if provided
         if (!is.null(series_rating())) {
-          p <- p + geom_hline(yintercept = series_rating(), color = "black", linetype = "solid", linewidth = 0.7)
+          abline(h = series_rating(), col = "black", lwd = 2)
         }
         
+        # Add custom axis titles and plot title
+        title(main = paste("IMDb Episode Ratings by Episode Number for", selected_show_name), cex.main = 1.4)
+        title(xlab = "Season", ylab = "Episode Rating", cex.lab = 1.4)
+        
+        # Add a box around the plot
+        box()
+        
         incProgress(1, detail = "Plot rendered successfully")
-        p
       })
     })
   })
   
   # Capture clicks and display episode details
+  # Capture the click and display the tooltip information
   output$tooltip_info <- renderUI({
-    req(input$plot_click)
-    clicked_point <- nearPoints(tv_shows_chosen()$data, input$plot_click, threshold = 5, maxpoints = 1)
+    req(input$plot_click)  # Ensure there is a click event
     
+    # Specify the xvar and yvar explicitly
+    clicked_point <- nearPoints(tv_shows_chosen()$data, input$plot_click, 
+                                xvar = "episodeNumber_overall", 
+                                yvar = "averageRating", 
+                                threshold = 5, maxpoints = 1)
+    
+    # Check if a point was clicked and format the information nicely
     if (nrow(clicked_point) > 0) {
       imdb_episode_url <- paste0("https://www.imdb.com/title/", clicked_point$tconst)
       
