@@ -3,8 +3,13 @@ library(shiny)
 
 
 # Read in data
-tv_shows <- read.csv(file = "popular_tv_shows.csv")
-tv_show_info <- readRDS("show_names.rds")
+#tv_shows <- read.csv(file = "popular_tv_shows.csv")
+#tv_show_info <- readRDS("show_names.rds")
+#unlink(temp) # Deletes tempfile
+
+
+url <- "https://github.com/iramler/imdb_tv_show_data/raw/main/data/show_names.csv"
+tv_show_info <- read.csv(url)
 tv_show_names <- tv_show_info$Show_Name
 
 # Define the UI
@@ -154,25 +159,56 @@ server <- function(input, output, session) {
   # Update selectize input for TV show selection
   updateSelectizeInput(session, 'show_name', choices = tv_show_names, 
                        selected = "Gilmore Girls", server = TRUE)
+
   
-  # Fetch the data for the selected show
+  ############################
+  ############################
+  ############################
+  
+  # Event reactive to load the correct CSV after the show is selected
+  tv_shows_chosen <- eventReactive(input$submit, {
+    # Get the tconst (ID) of the selected show
+    selected_show_id <- tv_show_info$parentTconst[tv_show_info$Show_Name == input$show_name]
+    
+    # Construct the URL for the CSV file
+    csv_url <- paste0("https://raw.githubusercontent.com/iramler/imdb_tv_show_data/main/data/", selected_show_id, ".csv")
+    
+    # Read the CSV file from the URL
+    show_data <- read.csv(csv_url)
+    
+    # Return the show data and selected show name
+    return(list(data = show_data, show_name = input$show_name, series_id = selected_show_id))
+  })
+  
+  ############################
+  ############################
+  ############################
+  
+  
+    
+  # Event reactive to load the correct CSV after the show is selected
   tv_shows_chosen <- eventReactive(input$submit, {
     withProgress(message = "Fetching data for selected show...", value = 0, {
       incProgress(0.5)
       
-      # Use base R to filter and arrange
-      show_data <- tv_shows[tv_shows$Show_Name == as.character(input$show_name), ]
-      show_data <- show_data[order(show_data$episodeNumber_overall), ]
-      
-      # Use base R to filter tv_show_info and pull the parentTconst
+      # Get the tconst (ID) of the selected show
       selected_show_id <- tv_show_info$parentTconst[tv_show_info$Show_Name == as.character(input$show_name)]
+      
+      # Construct the URL for the CSV file
+      csv_url <- paste0("https://raw.githubusercontent.com/iramler/imdb_tv_show_data/main/data/", selected_show_id, ".csv")
+      
+      # Read the CSV file from the URL
+      show_data <- read.csv(csv_url)
+      
+      # Sort the data by 'episodeNumber_overall' to ensure correct ordering
+      show_data <- show_data[order(show_data$episodeNumber_overall), ]
       
       incProgress(0.5, detail = "Data fetched successfully")
       
       # Reset the series rating when a new show is selected
       series_rating(NULL)
       
-      # Return the selected data and show name
+      # Return the show data and selected show name
       return(list(data = show_data, show_name = input$show_name, series_id = selected_show_id))
     })
   })
