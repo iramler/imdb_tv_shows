@@ -8,25 +8,27 @@ library(shiny)
 #unlink(temp) # Deletes tempfile
 
 
-url <- "https://github.com/iramler/imdb_tv_show_data/raw/main/data/show_names.csv"
-tv_show_info <- read.csv(url)
+
+tv_show_info <- read.csv("show_names.csv")
 tv_show_names <- tv_show_info$Show_Name
+
+episode_data <- readRDS("popular_tv_shows_episode_ratings.rds")
 
 # Define the UI
 ui <- fluidPage(
   tags$head(
-    # Insert Google Analytics tracking code here
-    HTML("
-      <!-- Google tag (gtag.js) -->
-      <script async src='https://www.googletagmanager.com/gtag/js?id=G-0G00NGQ5CF'></script>
-      <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-      
-        gtag('config', 'G-0G00NGQ5CF');
-      </script>
-    "),
+    # # Insert Google Analytics tracking code here
+    # HTML("
+    #   <!-- Google tag (gtag.js) -->
+    #   <script async src='https://www.googletagmanager.com/gtag/js?id=G-0G00NGQ5CF'></script>
+    #   <script>
+    #     window.dataLayer = window.dataLayer || [];
+    #     function gtag(){dataLayer.push(arguments);}
+    #     gtag('js', new Date());
+    #   
+    #     gtag('config', 'G-0G00NGQ5CF');
+    #   </script>
+    # "),
     
     
     
@@ -160,26 +162,6 @@ server <- function(input, output, session) {
   updateSelectizeInput(session, 'show_name', choices = tv_show_names, 
                        selected = "Gilmore Girls", server = TRUE)
 
-  
-  ############################
-  ############################
-  ############################
-  
-  # Event reactive to load the correct CSV after the show is selected
-  tv_shows_chosen <- eventReactive(input$submit, {
-    # Get the tconst (ID) of the selected show
-    selected_show_id <- tv_show_info$parentTconst[tv_show_info$Show_Name == input$show_name]
-    
-    # Construct the URL for the CSV file
-    csv_url <- paste0("https://raw.githubusercontent.com/iramler/imdb_tv_show_data/main/data/", selected_show_id, ".csv")
-    
-    # Read the CSV file from the URL
-    show_data <- read.csv(csv_url)
-    
-    # Return the show data and selected show name
-    return(list(data = show_data, show_name = input$show_name, series_id = selected_show_id))
-  })
-  
   ############################
   ############################
   ############################
@@ -194,14 +176,11 @@ server <- function(input, output, session) {
       # Get the tconst (ID) of the selected show
       selected_show_id <- tv_show_info$parentTconst[tv_show_info$Show_Name == as.character(input$show_name)]
       
-      # Construct the URL for the CSV file
-      csv_url <- paste0("https://raw.githubusercontent.com/iramler/imdb_tv_show_data/main/data/", selected_show_id, ".csv")
+      # Filter the episode_data for the selected show
+      show_data <- episode_data[episode_data$parentTconst == selected_show_id, ]
       
-      # Read the CSV file from the URL
-      show_data <- read.csv(csv_url)
-      
-      # Sort the data by 'episodeNumber_overall' to ensure correct ordering
-      show_data <- show_data[order(show_data$episodeNumber_overall), ]
+#      # Sort the data by 'episodeNumber_overall' to ensure correct ordering
+#      show_data <- show_data[order(show_data$episodeNumber_overall), ]
       
       incProgress(0.5, detail = "Data fetched successfully")
       
