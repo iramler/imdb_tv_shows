@@ -101,6 +101,8 @@ ui <- fluidPage(
   # Title, Author, Date in a single yellow block
   div(class = "header-block",
       h1("IMDb TV Show Analysis"),
+      h2("Caution - may contain spoilers"),
+      
       div(class = "author", "Maintained by Ivan Ramler"),
       div(class = "date", "Last updated September 2024")
   ),
